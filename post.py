@@ -4,6 +4,7 @@
 동작:
 1. 구글 시트 '시트1'에서 L열이 "예약 YY.MM.DD HH:MM" 이고 그 시간이 지난 행을 찾는다.
 2. 본문(D열)을 Threads에 올리고, 그 글에 링크 댓글을 단다. 댓글에는 '광고' 주제 태그를 붙인다.
+   (태그가 거부되면 그때만 댓글 맨 앞에 쿠팡 파트너스 고지 문구를 넣는다)
 3. 성공하면 L열을 "O"로, C열에 게시 날짜를 쓰고 같은 날짜 칸을 병합한다. M열에 게시 ID를 남긴다.
 
 본문 작성과 예약 시간 지정은 Claude 예약 작업이 아침에 해 둔다.
@@ -78,7 +79,7 @@ def create_and_publish(text, reply_to=None, topic_tag=None):
 def post_with_reply(body, links):
     main_id = create_and_publish(body)
     log("  본문 게시 완료:", main_id)
-    reply = f"{DISCLOSURE}\n\n{LINK_INTRO}\n\n" + "\n".join(links)
+    reply = f"{LINK_INTRO}\n\n" + "\n".join(links)
     reply_id, tagged = publish_reply(reply, main_id)
     log("  링크 댓글 게시 완료:", reply_id, "(광고 태그 O)" if tagged else "(광고 태그 X)")
     return main_id
@@ -89,9 +90,10 @@ def publish_reply(text, main_id):
     try:
         return create_and_publish(text, reply_to=main_id, topic_tag=TOPIC_TAG), True
     except RuntimeError as e:
-        log("  태그 포함 댓글 실패, 태그 없이 재시도:", str(e)[:200])
-        notice(f"댓글 광고 태그 거부됨: {str(e)[:200]}")
-        return create_and_publish(text, reply_to=main_id), False
+        # 광고 태그가 붙지 않으면 광고 표시가 없어지므로, 이때만 고지 문구를 맨 앞에 넣는다
+        log("  태그 포함 댓글 실패, 고지 문구를 넣어 재시도:", str(e)[:200])
+        notice(f"댓글 광고 태그 거부됨, 고지 문구로 대체: {str(e)[:200]}")
+        return create_and_publish(f"{DISCLOSURE}\n\n{text}", reply_to=main_id), False
 
 
 def notice(msg):
