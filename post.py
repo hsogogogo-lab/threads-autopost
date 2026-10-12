@@ -79,14 +79,31 @@ def post_with_reply(body, links):
     main_id = create_and_publish(body)
     log("  본문 게시 완료:", main_id)
     reply = f"{DISCLOSURE}\n\n{LINK_INTRO}\n\n" + "\n".join(links)
-    try:
-        reply_id = create_and_publish(reply, reply_to=main_id, topic_tag=TOPIC_TAG)
-    except RuntimeError as e:
-        # 댓글에 주제 태그가 거부되면 태그 없이 다시 시도 (고지 문구는 그대로 들어감)
-        log("  태그 포함 댓글 실패, 태그 없이 재시도:", str(e)[:120])
-        reply_id = create_and_publish(reply, reply_to=main_id)
-    log("  링크 댓글 게시 완료:", reply_id)
+    reply_id, tagged = publish_reply(reply, main_id)
+    log("  링크 댓글 게시 완료:", reply_id, "(광고 태그 O)" if tagged else "(광고 태그 X)")
     return main_id
+
+
+def publish_reply(text, main_id):
+    """댓글을 '광고' 주제 태그와 함께 올린다. 태그가 거부되면 태그 없이 올린다."""
+    try:
+        return create_and_publish(text, reply_to=main_id, topic_tag=TOPIC_TAG), True
+    except RuntimeError as e:
+        log("  태그 포함 댓글 실패, 태그 없이 재시도:", str(e)[:200])
+        notice(f"댓글 광고 태그 거부됨: {str(e)[:200]}")
+        return create_and_publish(text, reply_to=main_id), False
+
+
+def notice(msg):
+    """GitHub Actions 실행 결과 화면(요약)에 남는 메시지"""
+    print(f"::notice::{msg}", flush=True)
+
+
+def run_test(body, reply):
+    check_token()
+    main_id = create_and_publish(body)
+    reply_id, tagged = publish_reply(reply, main_id)
+    notice(f"테스트 게시 완료: 본문 {main_id}, 댓글 {reply_id}, 광고 태그 {'적용' if tagged else '미적용'}")
 
 
 # ---------------- 구글 시트 ----------------
@@ -221,12 +238,16 @@ def main():
         row[L], row[M] = "O", main_id
         mark_date_and_merge(sh, ws, rows, i, date_str)
         log("  시트 기록 완료")
+        notice(f"{num}번 {product} 게시 완료")
         time.sleep(5)
 
 
 if __name__ == "__main__":
     try:
-        main()
+        if os.environ.get("TEST_BODY"):
+            run_test(os.environ["TEST_BODY"], os.environ.get("TEST_REPLY") or "test")
+        else:
+            main()
     except Exception as e:  # noqa: BLE001
         log("오류:", e)
         sys.exit(1)

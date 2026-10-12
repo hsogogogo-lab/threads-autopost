@@ -11,6 +11,14 @@ on:
         description: "1 = 게시하지 않고 확인만"
         required: false
         default: "0"
+      test_body:
+        description: "테스트 글 본문 (입력하면 시트와 상관없이 이 글만 올림)"
+        required: false
+        default: ""
+      test_reply:
+        description: "테스트 댓글 (광고 태그가 붙음)"
+        required: false
+        default: ""
 
 concurrency:
   group: threads-post
@@ -36,3 +44,5 @@ jobs:
           SHEET_NAME: 시트1
           MAX_PER_RUN: "2"
           DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+          TEST_BODY: ${{ github.event.inputs.test_body }}
+          TEST_REPLY: ${{ github.event.inputs.test_reply }}
