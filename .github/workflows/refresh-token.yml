@@ -1,0 +1,21 @@
+name: Threads 토큰 갱신
+
+on:
+  schedule:
+    # 매달 29일 한국 시간 08:13 (UTC 28일 23:13). 토큰 유효기간이 60일이라 한 달에 한 번이면 충분
+    - cron: "13 23 28 * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python refresh_token.py
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}

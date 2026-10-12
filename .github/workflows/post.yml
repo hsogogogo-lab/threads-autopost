@@ -1,0 +1,37 @@
+name: Threads 자동 게시
+
+on:
+  schedule:
+    # 15분마다, 한국 시간 09:00 ~ 다음날 00:59 (UTC 00~15시)
+    - cron: "*/15 0-15 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1 = 게시하지 않고 확인만"
+        required: false
+        default: "0"
+
+concurrency:
+  group: threads-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python post.py
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SHEET_ID: 1u07Ux7xx6houiqwZBh_6gyMK2Z2BHCzQzF2S97sUS9c
+          SHEET_NAME: 시트1
+          MAX_PER_RUN: "2"
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
