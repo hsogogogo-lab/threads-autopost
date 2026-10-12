@@ -163,9 +163,23 @@ def mark_date_and_merge(sh, ws, rows, i, date_str):
 
 # ---------------- 메인 ----------------
 
+def check_token():
+    r = requests.get(f"{API}/me", params={"fields": "id,username", "access_token": TOKEN}, timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError(f"Threads 토큰 확인 실패 {r.status_code}: {r.text[:200]}")
+    me = r.json()
+    log(f"Threads 연결 확인: @{me.get('username')}")
+    if str(me.get("id")) != str(USER_ID).strip():
+        raise RuntimeError("THREADS_USER_ID가 토큰의 계정 ID와 다릅니다")
+
+
 def main():
     now = datetime.now(KST)
+    if DRY_RUN:
+        check_token()
     sh, ws = open_sheet()
+    if DRY_RUN:
+        log(f"시트 연결 확인: {sh.title} / {ws.title}")
     rows = ws.get(f"B{FIRST_ROW}:M2000")
     due = []
     for i, row in enumerate(rows):
