@@ -1,0 +1,56 @@
+name: Threads 타임별 게시 (5분 간격)
+
+# 06:00 / 12:00 / 18:00(한국 시간) 타임마다 시트에서 예약 시간이 지난 글을
+# 1개씩, 5분 간격으로 최대 10개 올린다. 실제 게시는 기존 post.py가 한다.
+# GitHub 예약 실행이 늦게 시작되는 걸 대비해 약 30분 일찍 시작해서 정각까지 기다린다.
+
+on:
+  schedule:
+    # UTC 기준: 20:27(전날) = 한국 05:27, 02:27 = 11:27, 08:27 = 17:27
+    - cron: "27 20,2,8 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: threads-post        # 기존 30분 게시와 같은 그룹 → 동시에 돌지 않음
+  cancel-in-progress: false
+
+jobs:
+  slot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: 정각까지 기다리기
+        run: |
+          now=$(date +%s)
+          wait=0
+          for slot in 06:00 12:00 18:00; do
+            t=$(TZ=Asia/Seoul date -d "today $slot" +%s)
+            if [ $t -gt $now ] && [ $((t - now)) -le 3600 ]; then wait=$((t - now)); fi
+          done
+          echo "대기 ${wait}초 (지금 한국 시간 $(TZ=Asia/Seoul date '+%H:%M'))"
+          sleep $wait
+
+      - name: 5분 간격으로 1개씩 게시 (최대 10개)
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SHEET_ID: 1u07Ux7xx6houiqwZBh_6gyMK2Z2BHCzQzF2S97sUS9c
+          SHEET_NAME: 시트1
+          MAX_PER_RUN: "1"
+          DRY_RUN: "0"
+          TEST_BODY: ""
+          TEST_REPLY: ""
+        run: |
+          for i in $(seq 1 10); do
+            echo "=== ${i}번째 ($(TZ=Asia/Seoul date '+%H:%M')) ==="
+            python post.py || echo "이번 회차 실패 (다음 회차 계속)"
+            if [ $i -lt 10 ]; then sleep 300; fi
+          done
