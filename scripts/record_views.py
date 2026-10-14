@@ -4,7 +4,7 @@
 환경변수:
   THREADS_ACCESS_TOKEN          Threads API 토큰 (게시용과 같은 것)
   GOOGLE_SERVICE_ACCOUNT_JSON   시트 접근용 서비스 계정 JSON 문자열
-  SPREADSHEET_ID                (기본값: 오아시스 시트)
+  SPREADSHEET_ID                시트 ID
   VIEWS_DELAY_HOURS             (기본값: 30)
 """
 import json, os, sys, datetime as dt
@@ -12,7 +12,7 @@ import requests, gspread
 
 API = "https://graph.threads.net/v1.0"
 TOKEN = os.environ["THREADS_ACCESS_TOKEN"]
-SHEET_ID = os.environ.get("SPREADSHEET_ID", "1u07Ux7xx6houiqwZBh_6gyMK2Z2BHCzQzF2S97sUS9c")
+SHEET_ID = os.environ["SPREADSHEET_ID"]
 DELAY = dt.timedelta(hours=float(os.environ.get("VIEWS_DELAY_HOURS", "30")))
 FIRST_ROW = 10  # 데이터 시작 행 (B10)
 
@@ -52,6 +52,7 @@ def main():
     me = get("me", fields="username")["username"]
     now = dt.datetime.now(dt.timezone.utc)
     updates = []
+    done = 0
     for i, r in enumerate(rows):
         r = (r + [""] * 12)[:12]
         num, G, H, L, M = r[0], r[5].strip(), r[6].strip(), r[10].strip(), r[11].strip()
@@ -65,10 +66,10 @@ def main():
                 continue
             v = views(M)
         except Exception as e:
-            print(f"[{num}] 본문 조회수 실패: {e}")
+            print("본문 조회수 실패 1건:", type(e).__name__)
             continue
         if v is None:
-            print(f"[{num}] 본문 조회수 없음")
+            print("본문 조회수 없음 1건")
             continue
         updates.append({"range": f"G{row}", "values": [[v]]})
         msg = f"[{num}] 행 {row}: 본문 {v}"
@@ -83,10 +84,10 @@ def main():
                     msg += ", 댓글 조회수 없음"
             except Exception as e:
                 msg += f", 댓글 조회수 실패: {e}"
-        print(msg)
+        done += 1
     if updates:
         ws.batch_update(updates, value_input_option="RAW")
-    print(f"기록 {len(updates)}칸")
+    print(f"조회수 기록 {done}건")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ jobs:
           THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
-          SHEET_ID: 1u07Ux7xx6houiqwZBh_6gyMK2Z2BHCzQzF2S97sUS9c
+          SHEET_ID: ${{ secrets.SHEET_ID }}
           SHEET_NAME: 시트1
           MAX_PER_RUN: "2"
           DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}

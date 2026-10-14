@@ -29,7 +29,16 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
+      - name: 이번 타임에 올릴 글이 있는지 확인
+        id: due
+        env:
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          SHEET_NAME: 시트1
+        run: python scripts/has_due.py
+
       - name: 정각까지 기다리기
+        if: steps.due.outputs.has == '1'
         run: |
           now=$(date +%s)
           wait=0
@@ -41,11 +50,12 @@ jobs:
           sleep $wait
 
       - name: 5분 간격으로 1개씩 게시 (최대 10개)
+        if: steps.due.outputs.has == '1'
         env:
           THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
-          SHEET_ID: 1u07Ux7xx6houiqwZBh_6gyMK2Z2BHCzQzF2S97sUS9c
+          SHEET_ID: ${{ secrets.SHEET_ID }}
           SHEET_NAME: 시트1
           MAX_PER_RUN: "1"
           DRY_RUN: "0"

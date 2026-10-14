@@ -16,7 +16,7 @@ r = requests.get(
     timeout=60,
 )
 if r.status_code != 200:
-    print("토큰 갱신 실패:", r.status_code, r.text[:200])
+    print("토큰 갱신 실패:", r.status_code)
     sys.exit(1)
 
 data = r.json()

@@ -6,6 +6,9 @@ on:
     - cron: "13 23 28 * *"
   workflow_dispatch:
 
+permissions:
+  contents: write   # 60일 동안 활동이 없으면 공개 저장소의 예약 실행이 꺼지므로, 매달 빈 커밋을 남긴다
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -19,3 +22,10 @@ jobs:
         env:
           THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
+      - name: 예약 실행이 꺼지지 않도록 활동 기록 남기기
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "월간 활동 기록 (예약 실행 유지용)"
+          git push

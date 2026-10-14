@@ -48,6 +48,15 @@ def log(*args):
     print(datetime.now(KST).strftime("[%H:%M:%S]"), *args, flush=True)
 
 
+def safe_err(e):
+    """공개 저장소 로그에 남지 않도록 오류 메시지에서 ID·토큰·주소 같은 값을 가린다."""
+    t = str(e)
+    t = re.sub(r"https?://\S+", "<url>", t)
+    t = re.sub(r"[A-Za-z0-9_\-]{20,}", "<id>", t)
+    t = re.sub(r"\d{8,}", "<id>", t)
+    return t[:150]
+
+
 # ---------------- Threads API ----------------
 
 def _post(path, data):
@@ -72,16 +81,16 @@ def create_and_publish(text, reply_to=None, topic_tag=None):
             return _post(f"{USER_ID}/threads_publish", {"creation_id": container})["id"]
         except RuntimeError as e:
             last = e
-            log("  게시 대기 중, 다시 시도:", str(e)[:120])
+            log("  게시 대기 중, 다시 시도:", safe_err(e))
     raise last
 
 
 def post_with_reply(body, links):
     main_id = create_and_publish(body)
-    log("  본문 게시 완료:", main_id)
+    log("  본문 게시 완료")
     reply = f"{LINK_INTRO}\n\n" + "\n".join(links)
     reply_id, tagged = publish_reply(reply, main_id)
-    log("  링크 댓글 게시 완료:", reply_id, "(광고 태그 O)" if tagged else "(광고 태그 X)")
+    log("  링크 댓글 게시 완료", "(광고 태그 O)" if tagged else "(광고 태그 X)")
     return main_id
 
 
@@ -91,8 +100,8 @@ def publish_reply(text, main_id):
         return create_and_publish(text, reply_to=main_id, topic_tag=TOPIC_TAG), True
     except RuntimeError as e:
         # 광고 태그가 붙지 않으면 광고 표시가 없어지므로, 이때만 고지 문구를 맨 앞에 넣는다
-        log("  태그 포함 댓글 실패, 고지 문구를 넣어 재시도:", str(e)[:200])
-        notice(f"댓글 광고 태그 거부됨, 고지 문구로 대체: {str(e)[:200]}")
+        log("  태그 포함 댓글 실패, 고지 문구를 넣어 재시도:", safe_err(e))
+        notice(f"댓글 광고 태그 거부됨, 고지 문구로 대체: {safe_err(e)}")
         return create_and_publish(f"{DISCLOSURE}\n\n{text}", reply_to=main_id), False
 
 
@@ -105,7 +114,7 @@ def run_test(body, reply):
     check_token()
     main_id = create_and_publish(body)
     reply_id, tagged = publish_reply(reply, main_id)
-    notice(f"테스트 게시 완료: 본문 {main_id}, 댓글 {reply_id}, 광고 태그 {'적용' if tagged else '미적용'}")
+    notice(f"테스트 게시 완료 (광고 태그 {'적용' if tagged else '미적용'})")
 
 
 # ---------------- 구글 시트 ----------------
@@ -187,7 +196,7 @@ def check_token():
     if r.status_code != 200:
         raise RuntimeError(f"Threads 토큰 확인 실패 {r.status_code}: {r.text[:200]}")
     me = r.json()
-    log(f"Threads 연결 확인: @{me.get('username')}")
+    log("Threads 연결 확인 완료")
     if str(me.get("id")) != str(USER_ID).strip():
         raise RuntimeError("THREADS_USER_ID가 토큰의 계정 ID와 다릅니다")
 
@@ -198,7 +207,7 @@ def main():
         check_token()
     sh, ws = open_sheet()
     if DRY_RUN:
-        log(f"시트 연결 확인: {sh.title} / {ws.title}")
+        log("시트 연결 확인 완료")
     rows = ws.get(f"B{FIRST_ROW}:M2000")
     due = []
     for i, row in enumerate(rows):
@@ -219,7 +228,7 @@ def main():
         sheet_row = FIRST_ROW + i
         num, body, product = cell(row, B), cell(row, D), cell(row, E)
         links = LINK_RE.findall(cell(row, K))[:2]
-        log(f"{num}번 {product} (예약 {when:%m/%d %H:%M})")
+        log(f"예약 {when:%H:%M} 글 게시 시작")
         if not body or not links:
             ws.update(values=[["실패 · 본문 또는 링크 없음"]], range_name=f"L{sheet_row}")
             log("  본문 또는 링크가 없어 건너뜀")
@@ -231,7 +240,7 @@ def main():
             main_id = post_with_reply(body, links)
         except Exception as e:  # noqa: BLE001
             ws.update(values=[[f"실패 · {str(e)[:80]}"]], range_name=f"L{sheet_row}")
-            log("  실패:", e)
+            log("  실패:", safe_err(e))
             continue
         date_str = datetime.now(KST).strftime("%y.%m.%d")
         ws.update(values=[["O", main_id]], range_name=f"L{sheet_row}:M{sheet_row}")
@@ -240,7 +249,7 @@ def main():
         row[L], row[M] = "O", main_id
         mark_date_and_merge(sh, ws, rows, i, date_str)
         log("  시트 기록 완료")
-        notice(f"{num}번 {product} 게시 완료")
+        notice(f"예약 {when:%H:%M} 글 게시 완료")
         time.sleep(5)
 
 
@@ -251,5 +260,5 @@ if __name__ == "__main__":
         else:
             main()
     except Exception as e:  # noqa: BLE001
-        log("오류:", e)
+        log("오류:", safe_err(e))
         sys.exit(1)
